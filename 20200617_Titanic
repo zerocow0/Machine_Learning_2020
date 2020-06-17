@@ -1,0 +1,328 @@
+import pandas as pd
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+#데이터 불러오기.
+from sklearn.model_selection import cross_val_score
+from sklearn.neural_network import MLPClassifier
+from sklearn.tree import DecisionTreeClassifier
+
+os.chdir('/Users/zerocow0/PycharmProjects/Titanic')
+train = pd.read_csv('train.csv')
+test = pd.read_csv('test.csv')
+
+#데이터의 형태를 확인하는 부분.
+print('train data shape: ', train.shape)
+print('test data shape: ', test.shape)
+
+print(train.info())
+print(test.info())
+
+#파이 차트를 만드는 함수.
+def pie_chart(feature):
+    feature_ratio = train[feature].value_counts(sort = False)
+    feature_size = feature_ratio.size
+    feature_index = feature_ratio.index
+
+    survived = train[train['Survived']==1][feature].value_counts()
+    dead = train[train['Survived']==0][feature].value_counts()
+
+    plt.plot(aspect = 'auto')
+    plt.pie(feature_ratio,labels=feature_index,autopct='%1.2f%%')
+    plt.title(feature+ '\'s ratio in total')
+    plt.show()
+
+    for i, index in enumerate(feature_index):
+        plt.subplot(1,feature_size+1,i+1,aspect='equal')
+        plt.pie([survived[index],dead[index]],labels=['Survived','Dead'],autopct='%1.2f%%')
+        plt.title(str(index) + '\'s ratio')
+
+    plt.show()
+
+#막대 차트를 만드는 함수.
+def bar_chart(feature):
+    survived = train[train['Survived']==1][feature].value_counts()
+    dead = train[train['Survived']==0][feature].value_counts()
+    df = pd.DataFrame([survived,dead])
+    df.index = ['Survived','Dead']
+    df.plot(kind='bar',stacked = True, figsize = (10,5))
+    plt.show()
+
+
+# 히트맵 차트를 만드는 함수.
+def correlation_heatmap(df):
+    _, ax = plt.subplots(figsize=(14, 12))
+    colormap = sns.diverging_palette(220, 10, as_cmap=True)
+
+    _ = sns.heatmap(
+        df.corr(),
+        cmap=colormap,
+        square=True,
+        cbar_kws={'shrink': .9},
+        ax=ax,
+        annot=True,
+        linewidths=0.1, vmax=1.0, linecolor='white',
+        annot_kws={'fontsize': 12}
+    )
+
+    plt.title('Pearson Correlation of Features', y=1.05, size=15)
+    plt.show()
+
+#나이별 생존자와 사망자의 분포표.
+def distributions():
+    fig, ax = plt.subplots(1, 1, figsize=(14, 12))
+    f = sns.kdeplot(train['Age'][(train['Survived'] == 0) & (train['Age'].notnull())],
+                    ax=ax, color="Blue", shade=True)
+    f = sns.kdeplot(train['Age'][(train['Survived'] == 1) & (train['Age'].notnull())],
+                    ax=ax, color="Green", shade=True)
+    f.set_xlabel("Age")
+    f.set_ylabel("Frequency")
+    f = f.legend(["Not Survived", "Survived"])
+
+
+    plt.show()
+
+#객실 등급과 성별을 나이에 따른 사망자와 생존자를 비교한 바이올린 그래프
+def violinplot():
+    f, ax = plt.subplots(1, 2, figsize=(18, 8))
+    sns.violinplot("Pclass", "Age", hue="Survived", data=train, split=True, ax=ax[0])
+    ax[0].set_title('Pclass and Age VS Survived')
+    ax[0].set_yticks(range(0, 110, 10))
+    sns.violinplot("Sex", "Age", hue="Survived", data=train, split=True, ax=ax[1])
+    ax[1].set_title('Sex and Age VS Survived')
+    ax[1].set_yticks(range(0, 110, 10))
+    plt.show()
+
+
+#데이터 전처리 전 기초 통계 분석자료(0이 사망자, 1이 생존자).
+#파이차트로 나타낼 수 있는 성별, 객실등급, Embarked에 따른 생존률 비교.
+pie_chart('Sex')
+pie_chart('Pclass')
+pie_chart('Embarked')
+
+#막대차트로 나타낼수 있는 SibSp, Parch에 따른 생존률 비
+bar_chart("SibSp")
+bar_chart("Parch")
+
+#분포표로 볼 수 있는 나이별 생존률
+distributions()
+
+#바이올린 그래프
+violinplot()
+
+#히트맵 그래프로 보는 데이터.
+correlation_heatmap(train)
+correlation_heatmap(test)
+
+
+
+#데이터 전처리 과정.
+train_test_data = [train, test] 
+
+sex_mapping = {'male':0, 'female':1}
+for dataset in train_test_data:
+    dataset['Sex'] = dataset['Sex'].map(sex_mapping)
+    
+
+train['Age'].fillna(train.groupby('Sex')['Age'].transform('median'), inplace=True) #Nan값 채워줌
+test['Age'].fillna(train.groupby('Sex')['Age'].transform('median'), inplace=True)
+
+
+
+
+
+
+for dataset in train_test_data:
+    dataset['Embarked'] = dataset['Embarked'].fillna('S')
+
+embarked_mapping = {'S':0, 'C':1, 'Q':2}
+for dataset in train_test_data:
+    dataset['Embarked'] = dataset['Embarked'].map(embarked_mapping)
+
+    
+train["Fare"].fillna(train.groupby('Pclass')['Fare'].transform('median'), inplace=True)# 비어있는 티켓가격
+
+test["Fare"].fillna(train.groupby('Pclass')['Fare'].transform('median'), inplace=True)
+for dataset in train_test_data:   #티켓 매핑
+    dataset.loc[ dataset['Fare'] <=17, 'Fare'] = 0,
+    dataset.loc[(dataset['Fare'] > 17) & (dataset['Fare'] <=30), 'Fare'] = 1,
+    dataset.loc[(dataset['Fare'] > 30) & (dataset['Fare'] <=100), 'Fare'] = 2,
+    dataset.loc[ dataset['Fare'] > 100, 'Fare'] = 3,
+
+
+
+
+
+    
+cabin_mapping = {'A':0, 'B':0.5, 'C':1, 'D':1.5, 'E':2, 'F':2.5, 'G':3, 'T': 3.5}
+for dataset in train_test_data:
+    dataset['Cabin'] = dataset['Cabin'].map(cabin_mapping)
+
+    
+    
+train['Cabin'].fillna(train.groupby('Pclass')['Cabin'].transform('median'), inplace=True)
+
+
+train['Family'] = train['SibSp'] + train['Parch'] + 1   #가족과 동승자 수를 하나로 합침  
+test['Family'] = test['SibSp'] + test['Parch'] + 1
+
+
+
+family_mapping = {1: 0, 2: 0.4, 3: 0.8, 4: 1.2, 5: 1.6, 6: 2, 7: 2.4, 8: 2.8, 9: 3.2, 10: 3.6, 11: 4}
+
+
+for dataset in train_test_data:
+    dataset['Family'] = dataset['Family'].map(family_mapping)
+
+    
+features_drop = ['Ticket', 'SibSp', 'Parch']
+train = train.drop(features_drop, axis=1)
+test = test.drop(features_drop, axis=1)
+train = train.drop(['PassengerId'], axis=1)
+    
+cols=['Survived', 'Age', 'Sex', 'Pclass']
+sns.pairplot(train[cols], height=4.0)
+plt.tight_layout()
+plt.show()
+
+print(train[cols].values.T)
+cm = np.corrcoef(train[cols].values.T)
+sns.set(font_scale=1.5)
+hm = sns.heatmap(cm, 
+                 cbar=True,
+                annot=True,
+                square=True,
+                fmt='.2f',
+                annot_kws={'size':15},
+                yticklabels=cols,
+                xticklabels=cols)
+
+#이름 Mr, Miss, Mrs 추출
+train_test_data = [train, test] 
+for dataset in train_test_data:
+    dataset['Title'] = dataset['Name'].str.extract(' ([A-Za-z]+)\.', expand=False)
+
+train['Title'].value_counts()
+test['Title'].value_counts()
+
+title_mapping = {"Mr": 0, "Miss": 1, "Mrs": 2, 
+                 "Master": 3, "Dr": 3, "Rev": 3, "Col": 3, "Major": 3, "Mlle": 3,"Countess": 3,
+                 "Ms": 3, "Lady": 3, "Jonkheer": 3, "Don": 3, "Dona" : 3, "Mme": 3,"Capt": 3,"Sir": 3 }
+for dataset in train_test_data:
+    dataset['Title'] = dataset['Title'].map(title_mapping)
+
+train.head()
+test.head()
+
+# Title있으니까 Name열 필요없으므로삭제
+train.drop('Name', axis=1, inplace=True)
+test.drop('Name', axis=1, inplace=True)
+print("------------Title Name 열 삭제------------")
+train.head()
+test.head()
+
+# Cabin 모르는값 많으므로 분석에서 임으적으로 제외하기 위해열 삭제
+train.isnull().sum()
+train.drop('Cabin', axis=1, inplace=True)
+test.drop('Cabin', axis=1, inplace=True)
+train.head()
+test.head()
+
+#확인해보기
+train.info()
+test.info()
+
+#target 설정
+target = train['Survived']
+train.shape, target.shape
+
+
+
+#종합적인 통계자료 표출
+print(train.head())
+print(test.head())
+train.info()
+
+#머신러닝 모듈작업.
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.utils import shuffle
+
+train = pd.get_dummies(train)
+test = pd.get_dummies(test)
+
+train_label = train['Survived']
+train_data = train.drop('Survived', axis=1)
+test_data = test.drop("PassengerId", axis=1).copy()
+
+train_data, train_label = shuffle(train_data,train_label,random_state = 5)
+
+
+#Regression을 모델별로 할수 있게 함수를 만든다.
+def train_and_test(model):
+    model.fit(train_data,train_label)
+    prediction = model.predict(test_data)
+    accuracy = round(model.score(train_data,train_label)*100,2)
+    print("Accuracy: ",accuracy, "%")
+    return prediction
+
+
+# Logistic Regression.
+log_pred = train_and_test(LogisticRegression())
+# SVM.
+svm_pred = train_and_test(SVC())
+# kNN.
+knn_pred_4 = train_and_test(KNeighborsClassifier(n_neighbors = 4))
+# Random Forest.
+rf_pred = train_and_test(RandomForestClassifier(n_estimators=100))
+# Navie Bayes.
+nb_pred = train_and_test(GaussianNB())
+# Decision Tree
+dc_pred = train_and_test(DecisionTreeClassifier())
+# Gardient Boosting
+gb_pred = train_and_test(GradientBoostingClassifier())
+#Multi-Layers Nueral Networks
+mlp_pred = train_and_test(MLPClassifier())
+
+
+
+
+'''
+
+import tensorflow as tf
+import keras
+from keras.models import Sequential
+from keras.layers.core import Dense
+from sklearn.preprocessing import LabelEncoder
+
+
+X = train.iloc[:,0:4].values
+y = train.iloc[:,4].values
+
+encoder = LabelEncoder()
+y1 = encoder.fit_transform(y)
+Y = pd.get_dummies(y1).values
+
+X_data =train.values[:, [1,2,3,4,5,7]]
+y_data =train.values[:, [0]]
+
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X_data,y_data,test_size=0.1, random_state= 7)
+
+np.random.seed(7)
+
+model = Sequential()
+model.add(Dense(255,input_shape=(6),activation='relu'))
+model.add(Dense((1),activation='sigmoid'))
+model.compile(loss='mse', optimizer='Adam', metrics=['accurracy'])
+
+model.summary()
+
+'''
+
+
