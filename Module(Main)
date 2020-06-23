@@ -1,0 +1,58 @@
+import pandas as pd
+from Graph import *
+
+#데이터 불러오기.
+train = pd.read_csv('data/train.csv')
+test = pd.read_csv('data/test.csv')
+a = Graph(train, test)
+print("---------- Train Data Info ----------")
+print(train.info())
+print("---------- Test Data Info ----------")
+print(test.info())
+
+# 파이 차트
+print("---------- Data Visualization ----------")
+a.pie_chart("Sex")
+a.pie_chart("Pclass")
+a.pie_chart("Embarked")
+
+# 막대 차트
+a.bar_chart("SibSp")
+a.bar_chart("Parch")
+
+# 히트맵 그리기
+a.correlation_heatmap(train)
+a.correlation_heatmap(test)
+
+# 생존/사망 분포표
+a.distributions()
+
+# 바이올린 그래프
+a.violinplot()
+
+#데이터 전처리
+print("---------- Data Preprocessing ----------")
+Preprocess(train, test)
+
+# Logistic Regression.
+print("---------- Data Regression ----------")
+train = pd.get_dummies(train)
+test = pd.get_dummies(test)
+
+print("------------------- Regression Results -------------------")
+print("Logistic Regression")
+log_pred = train_and_test(LogisticRegression())
+print("SVM.")
+svm_pred = train_and_test(SVC())
+print("KNN")
+knn_pred_4 = train_and_test(KNeighborsClassifier(n_neighbors=4))
+print("Random Forest.")
+rf_pred = train_and_test(RandomForestClassifier(n_estimators=100))
+print("Navie Bayes.")
+nb_pred = train_and_test(GaussianNB())
+print("Decision Tree")
+dc_pred = train_and_test(DecisionTreeClassifier())
+print("Gardient Boosting")
+gb_pred = train_and_test(GradientBoostingClassifier())
+print("Multi-Layers Nueral Networks")
+mlp_pred = train_and_test(MLPClassifier())
